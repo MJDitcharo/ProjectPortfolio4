@@ -57,6 +57,8 @@ VS_OUT main(VS_IN input)
 	output.pos = float4(input.pos + float3(0.0f, -0.75f, 0.75f), 1);
 	output.textcoord = input.textcoord;
 	output.norm = input.norm;
+	
+	
 
 	// TODO: Part 1h
 	return output;

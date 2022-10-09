@@ -343,7 +343,7 @@ public:
 		std::string VS = ShaderAsString("../Vertex_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
 		if (FAILED(D3DCompile(VS.c_str(), strlen(VS.c_str()),
-			nullptr, nullptr, nullptr, "main", "vs_5_0", compilerFlags, 0,
+			nullptr, nullptr, nullptr, "main", "vs_5_1", compilerFlags, 0,
 			vsBlob.GetAddressOf(), errors.GetAddressOf())))
 		{
 			std::cout << (char*)errors->GetBufferPointer() << std::endl;
@@ -354,7 +354,7 @@ public:
 		std::string PS = ShaderAsString("../Pixel_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> psBlob; errors.Reset();
 		if (FAILED(D3DCompile(PS.c_str(), strlen(PS.c_str()),
-			nullptr, nullptr, nullptr, "main", "ps_5_0", compilerFlags, 0,
+			nullptr, nullptr, nullptr, "main", "ps_5_1", compilerFlags, 0,
 			psBlob.GetAddressOf(), errors.GetAddressOf())))
 		{
 			std::cout << (char*)errors->GetBufferPointer() << std::endl;

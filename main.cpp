@@ -20,7 +20,7 @@ using namespace GRAPHICS;
 int main()
 {
 
-	levelParse("../GameLevel.txt");
+	//levelParse("../GameLevel.txt");
 
 
 	GWindow win;
