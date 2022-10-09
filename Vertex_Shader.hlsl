@@ -5,15 +5,17 @@
 // TODO: Part 4a
 // TODO: Part 1f
 // TODO: Part 4b
+#pragma pack_matrix(row_major)
+
 
 struct VS_IN {
 	float3 pos : POSITION;
-	float3 textcoord : TEXTCOORD;
+	float3 tex : TEXTCOORD;
 	float3 norm : NORMAL;
 };
 struct VS_OUT { 
 	float4 pos : SV_POSITION; 
-	float3 textcoord : TEXTCOORD;
+	float3 tex : TEXTCOORD;
 	float3 norm: NORMAL; 
 };
 
@@ -46,6 +48,9 @@ struct MESH_DATA
 
 };
 
+ConstantBuffer<SCENE_DATA> cameraAndLights   : register(b0, Space0);
+ConstantBuffer<MESH_DATA>  meshInfo			 : register(b1, Space0);
+
 // TODO: Part 4f
 // TODO: Part 4a
 // TODO: Part 1f
@@ -53,9 +58,14 @@ struct MESH_DATA
 VS_OUT main(VS_IN input)
 {
 
-	VS_OUT output;
-	output.pos = float4(input.pos + float3(0.0f, -0.75f, 0.75f), 1);
-	output.textcoord = input.textcoord;
+    VS_OUT output = (VS_OUT) 0;
+	output.pos = float4(input.pos, 1);
+	
+    output.pos = mul(output.pos, meshInfo.world);
+    output.pos = mul(output.pos, cameraAndLights.viewMatrix);
+    output.pos = mul(output.pos, cameraAndLights.projectionMatrix);
+	
+	output.tex = input.tex;
 	output.norm = input.norm;
 	
 	

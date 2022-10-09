@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 // TODO: Part 1b
 
@@ -47,6 +48,8 @@ struct MESH_DATA
 	OBJ_ATTRIBUTES material; // color/texture of surface
 	unsigned padding[28];
 };
+
+#pragma region HelperShit
 
 std::vector<GW::MATH::GMATRIXF> levelParse(const char* fileName)
 {
@@ -203,6 +206,8 @@ float angleToRadian(float input)
 {
 	return (input * PI) / 180;
 }
+#pragma endregion
+
 
 // Creation, Rendering & Cleanup
 class Renderer
@@ -219,10 +224,6 @@ class Renderer
 	GW::INPUT::GInput gInput;
 	GW::INPUT::GController gController;
 
-	// World, View, and Projection
-	GW::MATH::GMATRIXF world;
-	GW::MATH::GMATRIXF view;
-	GW::MATH::GMATRIXF projection;
 
 	// what we need at a minimum to draw a triangle
 	D3D12_VERTEX_BUFFER_VIEW					vertexView;
@@ -233,14 +234,25 @@ class Renderer
 
 
 	// TODO: Part 2c
+	Microsoft::WRL::ComPtr<ID3D12Resource>		constantBuffer;
+
 	// TODO: Part 2e
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>	pipeline;
+	ID3D12DescriptorHeap* descHeap[1];
+
+
 	// TODO: Part 2a
 	// TODO: Part 2b
 	// TODO: Part 4f
+	MESH_DATA logoMesh;
+	MESH_DATA titleMesh;
+	SCENE_DATA sceneData;
 
-
+	// World, View, and Projection
+	GW::MATH::GMATRIXF world;
+	GW::MATH::GMATRIXF view;
+	GW::MATH::GMATRIXF projection;
 
 
 	// Load a shader file as a string of characters.
@@ -290,6 +302,22 @@ public:
 		mat.IdentityF(projection);
 		mat.ProjectionDirectXLHF(fov, aspectRatio, nPlane, fPlane, projection);
 
+		sceneData.viewMatrix = view;
+		sceneData.projectionMatrix = projection;
+
+		GW::MATH::GVECTORF sunDirectionVec = { -1,-1, 2 };
+		sceneData.sunDirection = sunDirectionVec;
+		GW::MATH::GVECTORF sunColorVec = { 0.9f, 0.9f, 1.0f, 1.0f };
+		sceneData.sunColor = sunColorVec;
+
+		logoMesh.world = world;
+		logoMesh.material = FSLogo_materials[1].attrib;
+
+		titleMesh.world = world;
+		logoMesh.material = FSLogo_materials[0].attrib;
+
+
+
 		// TODO: part 2b
 		// TODO: Part 4f
 		// TODO: Part 1c
@@ -331,8 +359,59 @@ public:
 		}
 
 		// TODO: Part 2d
+		IDXGISwapChain4* swapChain;
+		d3d.GetSwapchain4((void**)&swapChain);
+		DXGI_SWAP_CHAIN_DESC swapChainDesc;
+		swapChain->GetDesc(&swapChainDesc);
+		unsigned meshOffset = sizeof(logoMesh) + sizeof(sceneData);
+		unsigned sceneOffset = sizeof(sceneData);
+		unsigned constBuffMemory = (sizeof(SCENE_DATA) + (FSLogo_meshcount * sizeof(MESH_DATA))) * swapChainDesc.BufferCount;
+		{
+
+
+
+			HRESULT hr = creator->CreateCommittedResource( // using UPLOAD heap for simplicity
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // DEFAULT recommend  
+				D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(constBuffMemory),
+				D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constantBuffer));
+
+			if (FAILED(hr))
+				throw(std::runtime_error::runtime_error("Error creating a const buffer."));
+
+			UINT8* transferMemoryLocation;
+			constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+				reinterpret_cast<void**>(&transferMemoryLocation));
+			memcpy(transferMemoryLocation, &sceneData, sizeof(SCENE_DATA));
+			memcpy(transferMemoryLocation + sceneOffset, &logoMesh, sizeof(MESH_DATA));
+			memcpy(transferMemoryLocation + meshOffset, &titleMesh, sizeof(MESH_DATA));
+			constantBuffer->Unmap(0, nullptr);
+
+		}
+
+
 		// TODO: Part 2e
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc{};
+		descHeapDesc.NumDescriptors = swapChainDesc.BufferCount;
+		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		creator->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&descHeap[0]));
+
 		// TODO: Part 2f
+		D3D12_CONSTANT_BUFFER_VIEW_DESC bufferDesc;
+		bufferDesc.BufferLocation = constantBuffer.Get()->GetGPUVirtualAddress();
+		bufferDesc.SizeInBytes = constBuffMemory;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE descHandle = descHeap[0]->GetCPUDescriptorHandleForHeapStart();
+		creator->CreateConstantBufferView(&bufferDesc, descHandle);
+
+		CD3DX12_ROOT_PARAMETER rootParameters[2];
+
+		rootParameters[0].InitAsConstantBufferView(0);
+		rootParameters[1].InitAsConstantBufferView(1);
+
+		CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
+		rootDesc.Init(2, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
 
 		// Create Vertex Shader
 		UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -369,9 +448,13 @@ public:
 		};
 		// TODO: Part 2g
 		// create root signature
+		CD3DX12_ROOT_PARAMETER rootParams[2];
+		rootParams[0].InitAsConstantBufferView(0);
+		rootParams[1].InitAsConstantBufferView(1);
+
 
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr,
+		rootSignatureDesc.Init(2, rootParams, 0, nullptr,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		Microsoft::WRL::ComPtr<ID3DBlob> signature;
 		D3D12SerializeRootSignature(&rootSignatureDesc,
@@ -412,6 +495,11 @@ public:
 		// setup the pipeline
 		cmd->SetGraphicsRootSignature(rootSignature.Get());
 		// TODO: Part 2h
+		cmd->SetDescriptorHeaps(1, descHeap);
+		cmd->SetGraphicsRootConstantBufferView(0, constantBuffer.Get()->GetGPUVirtualAddress());
+		cmd->SetGraphicsRootConstantBufferView(1, constantBuffer.Get()->GetGPUVirtualAddress() + sizeof(sceneData));
+		
+
 		// TODO: Part 4e
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
