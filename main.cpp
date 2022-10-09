@@ -19,6 +19,10 @@ using namespace GRAPHICS;
 // lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
 {
+
+	levelParse("../GameLevel.txt");
+
+
 	GWindow win;
 	GEventResponder msgs;
 	GDirectX12Surface d3d12;
