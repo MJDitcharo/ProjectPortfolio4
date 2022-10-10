@@ -30,7 +30,7 @@ int main()
 	{
 		// TODO: Part 1a
 		win.SetWindowName("Myles Ditcharo - Assignment 2 - D3D12");
-		float clr[] = { 248 / 255.0f, 200 / 255.0f, 220 / 255.0f, 1 }; // start with a jade color
+		float clr[] = { 36.8 / 255.0f, 57 / 255.0f, 26.5 / 255.0f, 1 }; // start with a jade color
 		msgs.Create([&](const GW::GEvent& e) {
 			GW::SYSTEM::GWindow::Events q;
 			if (+e.Read(q) && q == GWindow::Events::RESIZE)

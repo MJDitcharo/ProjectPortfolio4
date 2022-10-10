@@ -14,10 +14,12 @@ struct VS_IN {
 	float3 norm : NORMAL;
 };
 struct VS_OUT { 
-	float4 pos : SV_POSITION; 
+    float4 posH : SV_POSITION; // homogeneous projection space
+    float3 nrmW : NORMAL; // normal in world space (for lighting)
+    float3 posW : WORLD; // position in world space (for lighting)
 	float3 tex : TEXTCOORD;
-	float3 norm: NORMAL; 
 };
+
 
 struct OBJ_ATTRIBUTES
 {
@@ -35,9 +37,9 @@ struct OBJ_ATTRIBUTES
 
 struct SCENE_DATA
 {
-	float4 sunDirection, sunColor;
+	float4 sunDirection, sunColor, sunAmbience, cameraPos;
 	float4x4 viewMatrix, projectionMatrix;
-	float4 padding[6];
+	float4 padding[4];
 };
 
 struct MESH_DATA
@@ -46,6 +48,13 @@ struct MESH_DATA
 	OBJ_ATTRIBUTES material;
 	unsigned int padding[28];
 
+};
+
+struct OUTPUT_TO_RASTERIZER
+{
+    float4 posH : SV_POSITION; // homogeneous projection space
+    float3 nrmW : NORMAL; // normal in world space (for lighting)
+    float3 posW : WORLD; // position in world space (for lighting)
 };
 
 ConstantBuffer<SCENE_DATA> cameraAndLights   : register(b0, Space0);
@@ -58,20 +67,20 @@ ConstantBuffer<MESH_DATA>  meshInfo			 : register(b1, Space0);
 VS_OUT main(VS_IN input)
 {
 
-    VS_OUT output = (VS_OUT) 0;
-	output.pos = float4(input.pos, 1);
 	
-    output.pos = mul(output.pos, meshInfo.world);
-    output.pos = mul(output.pos, cameraAndLights.viewMatrix);
-    output.pos = mul(output.pos, cameraAndLights.projectionMatrix);
+    VS_OUT output = (VS_OUT) 0;
+    output.posW = input.pos;
+	
+    output.posH = mul(float4(output.posW, 1), meshInfo.world);
+    output.posH = mul(output.posH, cameraAndLights.viewMatrix);
+    output.posH = mul(output.posH, cameraAndLights.projectionMatrix);
+	
+    output.posW = mul(float4(input.pos, 1), meshInfo.world);
+    output.nrmW = mul(input.norm, meshInfo.world);
 	
 	output.tex = input.tex;
-	output.norm = input.norm;
-	
 	
 
-	// TODO: Part 1h
 	return output;
-	// TODO: Part 2i
 	// TODO: Part 4b
 }

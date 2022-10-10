@@ -36,9 +36,9 @@ constexpr auto PI = 3.14;
 
 struct SCENE_DATA
 {
-	GW::MATH::GVECTORF sunDirection, sunColor; // lighting info
+	GW::MATH::GVECTORF sunDirection, sunColor, sunAmbience, cameraPos; // lighting info
 	GW::MATH::GMATRIXF viewMatrix, projectionMatrix; // viewing info
-	GW::MATH::GVECTORF padding[6]; // D3D12 requires 256 byte aligned constant buffers
+	GW::MATH::GVECTORF padding[4]; // D3D12 requires 256 byte aligned constant buffers
 };
 
 struct MESH_DATA
@@ -248,11 +248,14 @@ class Renderer
 	MESH_DATA logoMesh;
 	MESH_DATA titleMesh;
 	SCENE_DATA sceneData;
+	GW::MATH::GVector vecProxy;
 
 	// World, View, and Projection
-	GW::MATH::GMATRIXF world;
+	GW::MATH::GMATRIXF worldTitle;
+	GW::MATH::GMATRIXF worldLogo;
 	GW::MATH::GMATRIXF view;
 	GW::MATH::GMATRIXF projection;
+
 
 
 	// Load a shader file as a string of characters.
@@ -286,13 +289,18 @@ public:
 
 
 		// TODO: part 2a
-		mat.IdentityF(world);
+		mat.IdentityF(worldTitle);
+		mat.IdentityF(worldLogo);
 
 		mat.IdentityF(view);
 		GVECTORF eye = { 0.75f, .25f, -1.5, 0 };
 		GVECTORF at = { 0.15f, 0.75f, 0, 0 };
 		GVECTORF up = { 0,1,0,0 };
 		mat.LookAtLHF(eye, at, up, view);
+
+		sceneData.cameraPos = eye;
+		GVECTORF ambientVec = { 0.25f, 0.25f, 0.35f, 1 };
+		sceneData.sunAmbience = ambientVec;
 
 		float fov = angleToRadian(65);
 		float nPlane = 0.1f;
@@ -306,15 +314,17 @@ public:
 		sceneData.projectionMatrix = projection;
 
 		GW::MATH::GVECTORF sunDirectionVec = { -1,-1, 2 };
+		vecProxy.NormalizeF(sunDirectionVec, sunDirectionVec);
 		sceneData.sunDirection = sunDirectionVec;
+
 		GW::MATH::GVECTORF sunColorVec = { 0.9f, 0.9f, 1.0f, 1.0f };
 		sceneData.sunColor = sunColorVec;
 
-		logoMesh.world = world;
-		logoMesh.material = FSLogo_materials[1].attrib;
-
-		titleMesh.world = world;
+		logoMesh.world = worldLogo;
 		logoMesh.material = FSLogo_materials[0].attrib;
+
+		titleMesh.world = worldTitle;
+		titleMesh.material = FSLogo_materials[1].attrib;
 
 
 
@@ -378,6 +388,7 @@ public:
 			if (FAILED(hr))
 				throw(std::runtime_error::runtime_error("Error creating a const buffer."));
 
+
 			UINT8* transferMemoryLocation;
 			constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 				reinterpret_cast<void**>(&transferMemoryLocation));
@@ -419,7 +430,7 @@ public:
 		compilerFlags |= D3DCOMPILE_DEBUG;
 #endif
 
-		std::string VS = ShaderAsString("../Vertex_Shader.hlsl");
+		std::string VS = ShaderAsString("Vertex_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
 		if (FAILED(D3DCompile(VS.c_str(), strlen(VS.c_str()),
 			nullptr, nullptr, nullptr, "main", "vs_5_1", compilerFlags, 0,
@@ -430,7 +441,7 @@ public:
 		}
 		// Create Pixel Shader
 
-		std::string PS = ShaderAsString("../Pixel_Shader.hlsl");
+		std::string PS = ShaderAsString("Pixel_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> psBlob; errors.Reset();
 		if (FAILED(D3DCompile(PS.c_str(), strlen(PS.c_str()),
 			nullptr, nullptr, nullptr, "main", "ps_5_1", compilerFlags, 0,
@@ -483,8 +494,8 @@ public:
 	}
 	void Render()
 	{
-		// TODO: Part 2a
-		// TODO: Part 4d
+	
+
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
@@ -492,23 +503,41 @@ public:
 		d3d.GetCommandList((void**)&cmd);
 		d3d.GetCurrentRenderTargetView((void**)&rtv);
 		d3d.GetDepthStencilView((void**)&dsv);
+
+
 		// setup the pipeline
 		cmd->SetGraphicsRootSignature(rootSignature.Get());
-		// TODO: Part 2h
 		cmd->SetDescriptorHeaps(1, descHeap);
 		cmd->SetGraphicsRootConstantBufferView(0, constantBuffer.Get()->GetGPUVirtualAddress());
 		cmd->SetGraphicsRootConstantBufferView(1, constantBuffer.Get()->GetGPUVirtualAddress() + sizeof(sceneData));
-		
 
-		// TODO: Part 4e
+
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 
 
 
-		//mat.RotateYLocalF(world, angleToRadian(1), world);
-		//SHADER_VARS shaderVars = { world, view, projection };
+		mat.RotateYGlobalF(titleMesh.world, angleToRadian(0.5), titleMesh.world);
 
+		// Update the Constant Buffer to Rotate Logo
+		{
+			IDXGISwapChain4* swapChain;
+			d3d.GetSwapchain4((void**)&swapChain);
+			DXGI_SWAP_CHAIN_DESC swapChainDesc;
+			swapChain->GetDesc(&swapChainDesc);
+
+			unsigned meshOffset = sizeof(logoMesh) + sizeof(sceneData);
+			unsigned sceneOffset = sizeof(sceneData);
+			unsigned constBuffMemory = (sizeof(SCENE_DATA) + (FSLogo_meshcount * sizeof(MESH_DATA))) * swapChainDesc.BufferCount;
+
+			UINT8* transferMemoryLocation;
+			constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+				reinterpret_cast<void**>(&transferMemoryLocation));
+			memcpy(transferMemoryLocation, &sceneData, sizeof(SCENE_DATA));
+			memcpy(transferMemoryLocation + sceneOffset, &logoMesh, sizeof(MESH_DATA));
+			memcpy(transferMemoryLocation + meshOffset, &titleMesh, sizeof(MESH_DATA));
+			constantBuffer->Unmap(0, nullptr);
+		}
 
 
 		// now we can draw
@@ -516,12 +545,14 @@ public:
 		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// TODO: Part 1h
 		cmd->IASetIndexBuffer(&indexView);
-		cmd->DrawIndexedInstanced(FSLogo_indexcount, 1, 0, 0, 0);
+		cmd->DrawIndexedInstanced(FSLogo_meshes[0].indexCount, 1, FSLogo_meshes[0].indexOffset, 0, 0);
 
-		// TODO: Part 3b
-			// TODO: Part 3c
-			// TODO: Part 4e
-		//cmd->DrawInstanced(3885, 1, 0, 0); // TODO: Part 1c
+
+		cmd->SetGraphicsRootConstantBufferView(1, constantBuffer.Get()->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + sizeof(MESH_DATA));
+		cmd->DrawIndexedInstanced(FSLogo_meshes[1].indexCount, 1, FSLogo_meshes[1].indexOffset, 0, 0);
+
+
+
 		// release temp handles
 		cmd->Release();
 	}
