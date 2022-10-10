@@ -544,6 +544,8 @@ public:
 		cmd->IASetVertexBuffers(0, 1, &vertexView);
 		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// TODO: Part 1h
+
+
 		cmd->IASetIndexBuffer(&indexView);
 		cmd->DrawIndexedInstanced(FSLogo_meshes[0].indexCount, 1, FSLogo_meshes[0].indexOffset, 0, 0);
 
