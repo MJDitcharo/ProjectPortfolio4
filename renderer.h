@@ -219,6 +219,7 @@ class Renderer
 
 	// Math Proxy
 	GW::MATH::GMatrix mat;
+	GW::MATH::GVector vecProxy;
 
 	// Camera Proxy
 	GW::INPUT::GInput gInput;
@@ -242,13 +243,10 @@ class Renderer
 	ID3D12DescriptorHeap* descHeap[1];
 
 
-	// TODO: Part 2a
-	// TODO: Part 2b
-	// TODO: Part 4f
+	
 	MESH_DATA logoMesh;
 	MESH_DATA titleMesh;
 	SCENE_DATA sceneData;
-	GW::MATH::GVector vecProxy;
 
 	// World, View, and Projection
 	GW::MATH::GMATRIXF worldTitle;
@@ -430,7 +428,7 @@ public:
 		compilerFlags |= D3DCOMPILE_DEBUG;
 #endif
 
-		std::string VS = ShaderAsString("Vertex_Shader.hlsl");
+		std::string VS = ShaderAsString("../Vertex_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
 		if (FAILED(D3DCompile(VS.c_str(), strlen(VS.c_str()),
 			nullptr, nullptr, nullptr, "main", "vs_5_1", compilerFlags, 0,
@@ -441,7 +439,7 @@ public:
 		}
 		// Create Pixel Shader
 
-		std::string PS = ShaderAsString("Pixel_Shader.hlsl");
+		std::string PS = ShaderAsString("../Pixel_Shader.hlsl");
 		Microsoft::WRL::ComPtr<ID3DBlob> psBlob; errors.Reset();
 		if (FAILED(D3DCompile(PS.c_str(), strlen(PS.c_str()),
 			nullptr, nullptr, nullptr, "main", "ps_5_1", compilerFlags, 0,

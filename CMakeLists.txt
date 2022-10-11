@@ -12,9 +12,12 @@ ADD_DEFINITIONS(-D_UNICODE)
 # CMake FXC shader compilation, add any shaders you want compiled here
 set(VERTEX_SHADERS 
 	# add vertex shader (.hlsl) files here
+	Vertex_Shader.hlsl
 )
 set(PIXEL_SHADERS 
 	# add pixel shader (.hlsl) files here
+	Pixel_Shader.hlsl
+	
 )
 
 # Add any new C/C++ source code here
